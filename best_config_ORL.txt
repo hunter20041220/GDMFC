@@ -1,0 +1,14 @@
+GDMFC Best Configuration for ORL Dataset
+========================================
+
+Layers: [400, 150, 40]
+Lambda1: 0.000010
+Lambda2: 0.001000
+Beta: 0.100000
+Gamma: 1.20
+K: 7
+
+Performance:
+  ACC    = 74.25%
+  NMI    = 87.03%
+  Purity = 76.25%
