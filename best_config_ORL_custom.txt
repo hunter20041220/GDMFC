@@ -1,0 +1,11 @@
+Layers: [400,150,40,, 40]
+lambda1: 0.000010
+lambda2: 0.001000
+beta: 0.100000
+gamma: 1.20
+k: 7
+
+Performance:
+  ACC=72.25%
+  NMI=85.52%
+  Purity=74.50%

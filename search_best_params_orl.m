@@ -94,13 +94,14 @@ X{1} = X1;
 X{2} = X2;
 y = labels;
 
-% Normalize
-for v = 1:2
-    X{v} = NormalizeFea(X{v}, 0);
-end
-
+% Do NOT normalize globally here. We'll run preprocessing per-trial so each
+% trial can apply `data_guiyi_choos` (user preprocessing) and then NormalizeFea.
+% Set default preprocessing mode (1..5) — change if desired.
+preprocess_mode = 3; % default: column-wise L2 normalization
+X_raw = X;   % keep original constructed features
+numView = length(X_raw);
 numCluster = numSubjects;
-fprintf('  Features constructed and normalized\n\n');
+fprintf('  Features constructed (preprocessing mode=%d will be applied per trial)\n\n', preprocess_mode);
 
 %% ==================== Parameter Search Space 参数搜索空间 ====================
 fprintf('Step 3: Defining parameter search space...\n');
@@ -204,6 +205,13 @@ for trial = 1:n_trials
     options.maxIter = 100;
     options.tol = 1e-5;
     
+    % Per-trial preprocessing: run user preprocessing then NormalizeFea
+    X = cell(1, numView);
+    for v = 1:numView
+        tmp = data_guiyi_choos({ X_raw{v} }, preprocess_mode); % returns cell
+        X{v} = NormalizeFea(tmp{1}, 0); % sample-wise L2 normalization
+    end
+
     % 运行GDMFC
     try
         tic;
