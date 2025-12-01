@@ -70,10 +70,10 @@ layers = [100, 50];  % hidden layer dimensions: 100 -> 50 -> numCluster
 % 使用较小的正则化系数以保证数值稳定性
 options = struct();
 options.lambda1 = 0.001;    % HSIC diversity coefficient HSIC多样性系数 (降低以提高稳定性)
-options.lambda2 = 0.001;    % co-orthogonal constraint coefficient 协正交约束系数 (降低)
-options.beta = 0.01;        % graph regularization coefficient 图正则化系数 (降低)
-options.gamma = 1.5;        % view weight parameter (must be > 1) 视图权重参数
-options.graph_k = 5;        % number of neighbors for graph construction 图构造邻居数
+options.lambda2 = 0.010;    % co-orthogonal constraint coefficient 协正交约束系数 (降低)
+options.beta = 115;        % graph regularization coefficient 图正则化系数 (降低)
+options.gamma = 1.2;        % view weight parameter (must be > 1) 视图权重参数
+options.graph_k = 7;        % number of neighbors for graph construction 图构造邻居数
 options.maxIter = 100;      % maximum iterations 最大迭代次数
 options.tol = 1e-5;         % convergence tolerance 收敛容差
 

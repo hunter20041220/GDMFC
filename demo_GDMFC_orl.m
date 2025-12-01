@@ -124,11 +124,18 @@ fprintf('  Number of clusters: %d\n\n', numCluster);
 %% ==================== Data Preprocessing 数据预处理 ====================
 fprintf('Step 3: Preprocessing data...\n');
 
-% Normalize each view 归一化每个视图
+% Preprocessing: run user preprocessing function first, then normalize
+% Choose preprocessing mode for data_guiyi_choos:
+% 1 - min-max, 2 - min-max (transposed), 3 - column-wise L2, 4 - column sum, 5 - global
+preprocess_mode = 4; % default: column-wise L2 normalization
+X = data_guiyi_choos(X, preprocess_mode);
+
+% Then apply sample-feature normalization (NormalizeFea keeps behavior consistent)
 for v = 1:numView
-    X{v} = NormalizeFea(X{v}, 0);  % L2 normalization
+    X{v} = NormalizeFea(X{v}, 0);  % L2 normalization (sample-wise)
 end
-fprintf('  Data normalized (L2 norm).\n\n');
+
+fprintf('  Data preprocessed (mode %d) and normalized (L2 norm).\n\n', preprocess_mode);
 
 %% ==================== Algorithm Parameters 算法参数 ====================
 fprintf('Step 4: Setting algorithm parameters...\n');
@@ -136,16 +143,20 @@ fprintf('Step 4: Setting algorithm parameters...\n');
 % Layer configuration 层配置
 % 对于40类,使用更深的结构
 layers = [500, 200, 100];  % hidden layers: 500 -> 200 -> 100 -> 40
+%layers = [200, 100, 50];
 
 % Algorithm parameters 算法参数
 % 对于更复杂的数据集,使用更小的正则化系数
 options = struct();
-options.lambda1 = 0.0001;   % HSIC diversity coefficient
-options.lambda2 = 0.0001;   % co-orthogonal constraint coefficient
-options.beta = 0.001;       % graph regularization coefficient
-options.gamma = 1.5;        % view weight parameter (must be > 1)
-options.graph_k = 5;        % number of neighbors for graph construction
-options.maxIter = 100;      % maximum iterations
+%options.lambda1 = 0.0001;   % HSIC diversity coefficient
+options.lambda1 = 0.0001;
+%options.lambda2 = 0.0010;   % co-orthogonal constraint coefficient
+options.lambda2 = 0.001;
+%options.beta = 0.001;       % graph regularization coefficient
+options.beta = 283; 
+options.gamma = 1.1;        % view weight parameter (must be > 1)
+options.graph_k = 11;        % number of neighbors for graph construction
+options.maxIter = 200;      % maximum iterations
 options.tol = 1e-5;         % convergence tolerance
 
 fprintf('  Layer structure: [');
