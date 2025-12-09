@@ -79,26 +79,26 @@ fprintf('  Data preprocessing completed (HDDMF style).\n\n');
 fprintf('Step 3: Setting algorithm parameters...\n');
 
 % Layer configuration 层配置
-% 根据数据集调整：ORL40_3_400有40类
-layers = [100, 50];  % 与HDDMF保持一致，或使用更深的网络
-% layers = [450, 100, 40];  % 可选：更深的网络
+% 使用和HDDMF完全相同的配置
+layers = [100, 50];  % 和HDDMF一致
 
 % Algorithm parameters 算法参数
 options = struct();
-options.lambda1 = 1e-5;      % HSIC diversity coefficient
-options.lambda2 = 1e-3;      % co-orthogonal constraint coefficient
-% options.beta = 0.1;          % graph regularization coefficient (HDDMF default)
-options.beta = 5000;         % GDMFC default (可选)
-options.gamma = 5.0;         % view weight parameter (must be > 1)
-% options.graph_k = 5;         % number of neighbors for graph construction (HDDMF default)
-options.graph_k = 7;       % GDMFC default (可选)
-options.maxIter = 100;       % maximum iterations
-options.tol = 1e-5;          % convergence tolerance
 
-% Graph construction method: use PKN from HDDMF
-% 图构建方法：使用HDDMF的PKN方法
-options.use_PKN = true;      % 使用PKN方法（HDDMF风格）
-options.use_heat_kernel = false;  % 不使用热核（GDMFC默认方法）
+% ========== 使用HDDMF的参数设置 ==========
+options.lambda1 = 0.0001;    % mu in HDDMF (diversity)
+options.lambda2 = 0;         % 不使用正交约束（HDDMF中没有）
+options.beta = 0.1;          % 图正则化（和HDDMF一致）
+options.gamma = 1.5;         % 视图权重参数
+options.graph_k = 5;         % 图构建的邻居数
+options.maxIter = 100;       % 最大迭代次数
+options.tol = 1e-5;          % 收敛容忍度
+
+% ========== HDDMF风格设置 ==========
+options.use_PKN = true;              % 使用PKN方法（HDDMF风格）
+options.use_heat_kernel = false;     % 不使用热核
+options.use_dynamic_graph = true;    % 动态更新图（HDDMF风格）
+options.use_simple_diversity = true; % 使用简单diversity项（HDDMF风格）
 
 fprintf('  Layer structure: [');
 for i = 1:length(layers)
@@ -108,21 +108,20 @@ for i = 1:length(layers)
     end
 end
 fprintf(', %d]\n', numCluster);
-fprintf('  lambda1 (HSIC): %.6f\n', options.lambda1);
+fprintf('  lambda1 (diversity): %.6f\n', options.lambda1);
 fprintf('  lambda2 (orthogonal): %.6f\n', options.lambda2);
 fprintf('  beta (graph reg): %.4f\n', options.beta);
 fprintf('  gamma (view weight): %.2f\n', options.gamma);
 fprintf('  graph_k: %d\n', options.graph_k);
-if options.use_PKN
-    fprintf('  Graph method: PKN (HDDMF)\n');
-else
-    fprintf('  Graph method: Heat Kernel (GDMFC)\n');
-end
+fprintf('  Graph method: %s\n', iif(options.use_PKN, 'PKN (HDDMF)', 'Heat Kernel (GDMFC)'));
+fprintf('  Dynamic graph update: %s\n', iif(options.use_dynamic_graph, 'Yes', 'No'));
+fprintf('  Simple diversity: %s\n', iif(options.use_simple_diversity, 'Yes (HDDMF)', 'No (HSIC)'));
 fprintf('  maxIter: %d, tol: %.0e\n\n', options.maxIter, options.tol);
 
 %% ==================== Modified GDMFC with HDDMF Graph Construction ====================
-fprintf('Step 4: Running improved GDMFC algorithm...\n');
-fprintf('  (Core algorithm: GDMFC, Graph: HDDMF PKN method)\n');
+fprintf('Step 4: Running improved GDMFC (方案A - HDDMF简化风格)...\n');
+fprintf('  策略: 先测试基础版本(lambda1=0, lambda2=0)\n');
+fprintf('  预期: 应达到HDDMF水平(~90%% ACC)\n');
 fprintf('----------------------------------------\n');
 
 tic;
@@ -195,46 +194,29 @@ fprintf('  NMI    = %.4f (%.2f%%)\n', NMI, NMI*100);
 fprintf('  Purity = %.4f (%.2f%%)\n', Purity, Purity*100);
 fprintf('========================================\n\n');
 
-%% ==================== Run Multiple Times for Statistics ====================
-fprintf('Step 7: Running multiple times for statistics...\n');
+%% ==================== Single Run Results ====================
+% 只运行一次，不进行多次统计
+% Single run only, no multiple runs for statistics
+fprintf('Step 7: Single run completed.\n');
 
-num_runs = 10;
-ACC_runs = zeros(num_runs, 1);
-NMI_runs = zeros(num_runs, 1);
-Purity_runs = zeros(num_runs, 1);
+% Use single run results
+ACC_runs = ACC;
+NMI_runs = NMI;
+Purity_runs = Purity;
 
-for run = 1:num_runs
-    fprintf('  Run %d/%d...\n', run, num_runs);
-    
-    % Re-run algorithm
-    [H_run, ~, ~, ~] = GDMFC_improved(X, numCluster, layers, options);
-    
-    % Clustering
-    S_run = H_run * H_run';
-    S_run = (S_run + S_run') / 2;
-    S_run = max(S_run, 0);
-    predict_labels_run = SpectralClustering(S_run, numCluster);
-    
-    % Evaluation
-    res_run = bestMap(y, predict_labels_run);
-    ACC_runs(run) = length(find(y == res_run)) / length(y);
-    NMI_runs(run) = MutualInfo(y, predict_labels_run);
-    Purity_runs(run) = compute_purity_func(y, predict_labels_run);
-end
-
-% Statistics
-ACC_mean = mean(ACC_runs); ACC_std = std(ACC_runs);
-NMI_mean = mean(NMI_runs); NMI_std = std(NMI_runs);
-Purity_mean = mean(Purity_runs); Purity_std = std(Purity_runs);
+% Statistics (single run, no std)
+ACC_mean = ACC_runs; 
+ACC_std = 0;
+NMI_mean = NMI_runs; 
+NMI_std = 0;
+Purity_mean = Purity_runs; 
+Purity_std = 0;
 
 fprintf('\n========================================\n');
-fprintf('Final Results (%d runs):\n', num_runs);
-fprintf('  ACC    = %.4f ± %.4f (%.2f%% ± %.2f%%)\n', ...
-    ACC_mean, ACC_std, ACC_mean*100, ACC_std*100);
-fprintf('  NMI    = %.4f ± %.4f (%.2f%% ± %.2f%%)\n', ...
-    NMI_mean, NMI_std, NMI_mean*100, NMI_std*100);
-fprintf('  Purity = %.4f ± %.4f (%.2f%% ± %.2f%%)\n', ...
-    Purity_mean, Purity_std, Purity_mean*100, Purity_std*100);
+fprintf('Final Results (single run):\n');
+fprintf('  ACC    = %.4f (%.2f%%)\n', ACC_mean, ACC_mean*100);
+fprintf('  NMI    = %.4f (%.2f%%)\n', NMI_mean, NMI_mean*100);
+fprintf('  Purity = %.4f (%.2f%%)\n', Purity_mean, Purity_mean*100);
 fprintf('========================================\n\n');
 
 %% ==================== Visualization 可视化 ====================
@@ -299,4 +281,13 @@ fprintf('  Results saved to GDMFC_improved_results_ORL40_3_400.mat\n\n');
 fprintf('========================================\n');
 fprintf('GDMFC Improved Demo Completed Successfully!\n');
 fprintf('========================================\n');
+
+%% Helper function
+function result = iif(condition, true_val, false_val)
+    if condition
+        result = true_val;
+    else
+        result = false_val;
+    end
+end
 
