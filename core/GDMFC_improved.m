@@ -20,6 +20,8 @@ function [H, Z, alpha, obj_values] = GDMFC_improved(X, numCluster, layers, optio
 %       .tol: convergence tolerance (default: 1e-5)
 %       .use_PKN: use PKN method from HDDMF (default: true)
 %       .use_heat_kernel: use heat kernel method from GDMFC (default: false)
+%       .use_dynamic_graph: dynamically update graph in iterations (default: true)
+%       .use_simple_diversity: use simple HDDMF diversity instead of HSIC (default: true)
 %
 % Output:
 %   H: the final low-dimensional representation (n x k)
@@ -55,6 +57,8 @@ if ~isfield(options, 'maxIter'), options.maxIter = 100; end
 if ~isfield(options, 'tol'), options.tol = 1e-5; end
 if ~isfield(options, 'use_PKN'), options.use_PKN = true; end
 if ~isfield(options, 'use_heat_kernel'), options.use_heat_kernel = false; end
+if ~isfield(options, 'use_dynamic_graph'), options.use_dynamic_graph = true; end
+if ~isfield(options, 'use_simple_diversity'), options.use_simple_diversity = true; end
 
 lambda1 = options.lambda1;
 lambda2 = options.lambda2;
@@ -64,6 +68,8 @@ graph_k = options.graph_k;
 maxIter = options.maxIter;
 tol = options.tol;
 use_PKN = options.use_PKN;
+use_dynamic_graph = options.use_dynamic_graph;
+use_simple_diversity = options.use_simple_diversity;
 
 % Construct graph Laplacian for each view 为每个视图构建图拉普拉斯矩阵
 fprintf('Constructing graph Laplacian matrices...\n');
@@ -140,135 +146,90 @@ fprintf('Phase 2: Joint fine-tuning with alternating optimization...\n');
 obj_values = zeros(maxIter, 1);
 
 for iter = 1:maxIter
-    % ========== Update Z matrices (all layers, all views) 更新Z矩阵 ==========
-    % 矩阵形式：X^T ≈ Z_1 * Z_2 * ... * Z_m * H_m^T
-    % 其中 X: n×d_v, Z_i: d_{i-1}×d_i, H_m: n×d_m
-    for v = 1:numView
-        % 对于第一层 Z_1: X^T ≈ Z_1 * (Z_2*...*Z_m*H_m^T)
-        % 计算右侧乘积 (从H_m开始)
-        right_prod = H{v, m+1}';  % d_m × n
-        for j = m+1:-1:2
-            right_prod = Z{v, j} * right_prod;  % 逐层左乘
-        end
-        % X^T (d_v × n) ≈ Z_1 (d_v × d_1) * right_prod (d_1 × n)
-        Z{v, 1} = X{v}' * pinv(right_prod);  % (d_v × n) * (n × d_1) = d_v × d_1
-        
-        % 对于中间层 Z_i (i=2,...,m)
-        for i = 2:m
-            % 左侧乘积: Z_1 * ... * Z_{i-1}
-            left_prod = Z{v, 1};
-            for j = 2:i-1
-                left_prod = left_prod * Z{v, j};
+    % ========== Dynamic Graph Update (HDDMF style) 动态图更新 ==========
+    % 从第2次迭代开始，使用H_m来更新图（超图或普通图）
+    if use_dynamic_graph && iter > 1
+        for v = 1:numView
+            if use_PKN
+                % 使用PKN在H_m上构建图
+                L{v} = constructGraphLaplacian_PKN(H{v, m+1}, graph_k);
+            else
+                % 使用热核在H_m上构建图
+                L{v} = constructGraphLaplacian(H{v, m+1}, graph_k);
             end
-            % 右侧乘积: Z_{i+1} * ... * Z_m * H_m^T
-            right_prod = H{v, m+1}';
-            for j = m+1:-1:i+1
-                right_prod = Z{v, j} * right_prod;
-            end
-            % left_prod^T * X^T ≈ Z_i * right_prod
-            Z{v, i} = pinv(left_prod) * X{v}' * pinv(right_prod);
-        end
-        
-        % 对于最后一层 Z_{m+1}: (Z_1*...*Z_m)^T * X^T ≈ Z_{m+1} * H_{m+1}^T
-        if m > 0
-            left_prod = Z{v, 1};
-            for j = 2:m
-                left_prod = left_prod * Z{v, j};
-            end
-            Z{v, m+1} = pinv(left_prod) * X{v}' * pinv(H{v, m+1}');
-        else
-            % 如果没有隐藏层，直接 X^T ≈ Z * H^T
-            Z{v, 1} = X{v}' * pinv(H{v, 1}');
         end
     end
     
-    % ========== Update H_m (only the last layer) 只更新最后一层H_m ==========
-    % 根据推导：只有H_m需要通过乘法规则更新，中间层H通过重构得到
-    % 完整更新规则包含：重构项、图正则化、HSIC多样性、协正交约束
+    % ========== Update Z and H (完全HDDMF实现) ==========
     for v = 1:numView
-        % 计算 Φ_m = Z_1 * Z_2 * ... * Z_m
-        % X^T ≈ Φ_m * H_m^T，所以 X ≈ H_m * Φ_m^T
-        if m == 0
-            Phi_m = eye(size(X{v}, 2));
-        else
-            Phi_m = Z{v, 1};
-            for j = 2:m+1
-                Phi_m = Phi_m * Z{v, j};
-            end
-        end
+        X_v = X{v}';  % 转为HDDMF格式: d_v × n
         
-        % ===== 计算所有梯度项 =====
+        % Step 1: 计算H_err (错误传播) - HDDMF方式
+        H_err = cell(1, m+1);
+        H_err{m+1} = H{v, m+1}';  % k × n (转置为HDDMF格式)
         
-        % (A) 重构项：||X - H_m * Φ_m^T||^2
-        XPhi = X{v} * Phi_m;  % n × d_m，对应 (Φ_m^T * X^T)^T
-        PhiTPhi = Phi_m' * Phi_m;  % d_m × d_m
-        HPhiTPhi = H{v, m+1} * PhiTPhi;  % n × d_m，对应 Φ_m^T * Φ_m * H_m^T (转置后)
-        
-        % (B) 图正则化项：tr(H_m^T * L * H_m) 的梯度是 2*L*H_m (n×n)*(n×d_m)
-        LH = L{v} * H{v, m+1};  % n × d_m
-        
-        % (C) HSIC多样性项：需要计算 K_{-v} = Σ_{w≠v} H * K^(w) * H
-        % 其中 H 是中心化矩阵 (n×n), K^(w) 是样本核矩阵 (Gram matrix)
-        % 正确的核矩阵：K^(w) = H_m^(w) * H_m^(w)^T (n×n，样本间的内积)
-        n_samples = size(H{v, m+1}, 1);
-        H_center = eye(n_samples) - ones(n_samples) / n_samples;  % 中心化矩阵 (n×n)
-        K_minus_v = zeros(n_samples, n_samples);
-        for w = 1:numView
-            if w ~= v
-                K_w = H{w, m+1} * H{w, m+1}';  % n × n (样本核，Gram矩阵)
-                K_minus_v = K_minus_v + H_center * K_w * H_center;  % n × n
-            end
-        end
-        KH = K_minus_v * H{v, m+1};  % (n×n) * (n×d_m) = n × d_m
-        
-        % (D) 协正交约束项：||H_m * H_m^T - I||^2 的梯度是 4*H_m*H_m^T*H_m - 4*H_m
-        HHt = H{v, m+1} * H{v, m+1}';  % n × n
-        HHtH = HHt * H{v, m+1};  % n × d_m
-        
-        % ===== 组合梯度为分子和分母（乘法更新规则）=====
-        % 根据推导：
-        % ∇^+ = 2(α^γ)[Φ_m^T*Φ_m*H_m + β*D*H_m] + 4λ2*H_m*H_m^T*H_m
-        % ∇^- = 2(α^γ)[Φ_m^T*X + β*W*H_m] + 2λ1*H_m*K_{-v} + 4λ2*H_m
-        
-        % 分解 L = D - W
-        D_mat = diag(sum(abs(L{v}), 2));  % 度矩阵 (n×n对角阵)
-        W_mat = D_mat - L{v};  % 权重矩阵 (n×n)
-        
-        % D和W是n×n矩阵，H是n×d_m，所以是 D*H 和 W*H
-        DH = D_mat * H{v, m+1};  % (n×n) * (n×d_m) = n×d_m
-        WH = W_mat * H{v, m+1};  % (n×n) * (n×d_m) = n×d_m
-        
-        % 分子（梯度负部，促进增长）
-        numer = (alpha(v)^gamma) * (XPhi + beta * WH) ...
-                + lambda1 * KH ...
-                + 2 * lambda2 * H{v, m+1};
-        
-        % 分母（梯度正部，抑制增长）
-        denom = (alpha(v)^gamma) * (HPhiTPhi + beta * DH) ...
-                + 2 * lambda2 * HHtH;
-        
-        % 数值稳定性处理
-        numer = max(numer, 1e-10);
-        denom = max(denom, 1e-10);
-        
-        % 乘法更新规则：H ← H ⊙ √(∇^- / ∇^+)
-        % 添加学习率 η 进行阻尼：H ← H ⊙ (√(∇^- / ∇^+))^η
-        eta = 0.5;  % 学习率/阻尼因子，防止更新过大导致发散
-        update_ratio = (numer ./ denom).^(eta/2);  % 等价于 (sqrt(...))^eta
-        update_ratio(isnan(update_ratio) | isinf(update_ratio)) = 1;
-        
-        % 限制更新幅度，防止单次更新过大
-        update_ratio = min(update_ratio, 2);  % 最多增长2倍
-        update_ratio = max(update_ratio, 0.5);  % 最多减小到0.5倍
-        
-        H{v, m+1} = H{v, m+1} .* update_ratio;
-        
-        % 确保H非负且不为零
-        H{v, m+1} = max(H{v, m+1}, 1e-10);
-        
-        % 重构中间层 H_i (i < m+1): H_i^T = Z_{i+1} * H_{i+1}^T
+        % 反向传播计算H_err
         for i = m:-1:1
-            H{v, i} = (Z{v, i+1} * H{v, i+1}')';
+            H_err{i} = Z{v, i+1} * H_err{i+1};  % d_i × n
+        end
+        
+        % Step 2: 逐层更新Z和H
+        D_cumul = [];
+        for i = 1:m+1
+            % 2.1 更新Z{i} (HDDMF方式)
+            if i == 1
+                Z{v, 1} = X_v * pinv(H_err{1});  % (d_v × n) * (n × d_1) = d_v × d_1
+                D_cumul = Z{v, 1}';  % d_1 × d_v
+            else
+                Z{v, i} = pinv(D_cumul') * X_v * pinv(H_err{i});  
+                D_cumul = Z{v, i}' * D_cumul;  % d_i × d_v (累积)
+            end
+            
+            % 2.2 更新H{i} (HDDMF方式 - 每一层都更新)
+            A = D_cumul * X_v;  % d_i × n
+            B = D_cumul * D_cumul';  % d_i × d_i
+            
+            Ap = (abs(A) + A) / 2;
+            An = (abs(A) - A) / 2;
+            Bp = (abs(B) + B) / 2;
+            Bn = (abs(B) - B) / 2;
+            
+            % 获取当前层H (k_i × n格式)
+            H_i = H{v, i}';
+            
+            % 根据HDDMF：中间层和最后一层的更新方式不同
+            if i < m+1
+                % 中间层：只做基础更新（不含图正则化）
+                H_i = H_i .* sqrt((Ap + Bn * H_i) ./ max(An + Bp * H_i, 1e-10));
+            else
+                % 最后一层(i == m+1)：包含图正则化和diversity
+                % 图正则化项
+                HmL = H_i * L{v};
+                HmLp = (abs(HmL) + HmL) / 2;
+                HmLn = (abs(HmL) - HmL) / 2;
+                
+                % 计算分子分母（完整公式，包括图项）
+                Hm_a = Ap + Bn * H_i + beta * HmLn;
+                Hm_b = An + Bp * H_i + beta * HmLp;
+                
+                % Diversity term (HDDMF style)
+                if use_simple_diversity && lambda1 > 0
+                    R = zeros(size(H_i));  % k × n
+                    for w = 1:numView
+                        if w ~= v
+                            Hw = H{w, m+1}';  % k × n
+                            R = R + H_i * Hw' * Hw;  % (k×n) * (n×k) * (k×n)
+                        end
+                    end
+                    Hm_b = Hm_b + lambda1 * R;
+                end
+                
+                % 最终更新（一次性完成）
+                H_i = H_i .* sqrt(Hm_a ./ max(Hm_b, 1e-10));
+            end
+            
+            % 转置回n × k格式存储
+            H{v, i} = H_i';
         end
     end
     
@@ -312,20 +273,23 @@ for iter = 1:maxIter
         obj = obj + alpha(v)^gamma * R(v);
     end
     
-    % Graph regularization term (already included in R)
-    % 图正则化项已包含在R中
-    
-    % HSIC diversity term HSIC多样性项
-    for v = 1:numView
-        for w = v+1:numView
-            obj = obj - lambda1 * computeHSIC(H{v, m+1}, H{w, m+1});
+    % Diversity term (simple HDDMF style)
+    if use_simple_diversity && lambda1 > 0
+        for v = 1:numView
+            for w = v+1:numView
+                % trace(H^(v)' * H^(v) * H^(w)' * H^(w))
+                div_term = trace(H{v, m+1}' * H{v, m+1} * H{w, m+1}' * H{w, m+1});
+                obj = obj + lambda1 * div_term;  % 注意：diversity是惩罚项，所以加号
+            end
         end
     end
     
     % Co-orthogonal constraint term 协正交约束项
-    for v = 1:numView
-        HHt = H{v, m+1} * H{v, m+1}';
-        obj = obj + lambda2 * norm(HHt - eye(n), 'fro')^2;
+    if lambda2 > 0
+        for v = 1:numView
+            HHt = H{v, m+1} * H{v, m+1}';
+            obj = obj + lambda2 * norm(HHt - eye(n), 'fro')^2;
+        end
     end
     
     obj_values(iter) = obj;
@@ -346,19 +310,16 @@ for iter = 1:maxIter
 end
 
 % Return the final consensus representation 返回最终的一致性表示
-% Average the last layer representations across all views
-% 对所有视图的最后一层表示取平均
-H_final = zeros(n, numCluster);
+% 完全按照HDDMF方式：所有视图最后一层的简单平均
+% HDDMF: Hstar = Hstar./numOfView (Hstar是k×n格式)
+H_final_kn = zeros(numCluster, n);  % k × n格式
 for v = 1:numView
-    H_final = H_final + alpha(v) * H{v, m+1};
+    H_final_kn = H_final_kn + H{v, m+1}';  % 累加k×n
 end
+H_final_kn = H_final_kn / numView;  % 简单平均
 
-% 确保H_final非负且归一化
-H_final = max(H_final, 0);
-% 行归一化
-H_final = bsxfun(@rdivide, H_final, sqrt(sum(H_final.^2, 2)) + 1e-10);
-
-H = H_final;
+% 转置为n×k格式返回
+H = H_final_kn';  % n × k
 
 fprintf('GDMFC_improved optimization completed.\n');
 end

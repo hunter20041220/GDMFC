@@ -11,7 +11,12 @@
 clear; clc; close all;
 
 %% Add paths 添加路径
-addpath(genpath('../DMF_MVC'));  % 添加辅助函数路径
+% Get the directory of this script
+script_dir = fileparts(mfilename('fullpath'));
+% Get GDMFC root directory (parent of demos/)
+gdmfc_root = fileparts(script_dir);
+% Add paths
+addpath(genpath(gdmfc_root));
 
 fprintf('========================================\n');
 fprintf('GDMFC Demo on ORL Face Dataset\n');
@@ -21,7 +26,8 @@ fprintf('========================================\n\n');
 fprintf('Step 1: Loading ORL face dataset...\n');
 
 % Dataset path 数据集路径
-dataPath = '../../dataset/orl';
+% Navigate from GDMFC root to dataset folder
+dataPath = fullfile(fileparts(fileparts(gdmfc_root)), 'dataset', 'orl');
 
 % ORL dataset parameters ORL数据集参数
 numSubjects = 40;      % 人数 (number of subjects)
@@ -145,20 +151,20 @@ fprintf('Step 4: Setting algorithm parameters...\n');
 %layers = [500, 200, 100];  % hidden layers: 500 -> 200 -> 100 -> 40
 %layers = [200, 100, 50];
 %layers = [450, 200, 100, 40];
-%layers = [450, 150, 40];
-layers = [300, 200, 100, 50];
+layers = [450, 150, 40];
+% layers = [300, 200, 100, 50];
 
 % Algorithm parameters 算法参数
 % 对于更复杂的数据集,使用更小的正则化系数
 options = struct();
-%options.lambda1 = 0.0001;   % HSIC diversity coefficient
-options.lambda1 = 1e-5;
-%options.lambda2 = 0.0010;   % co-orthogonal constraint coefficient
-options.lambda2 = 1e-3;
+options.lambda1 = 0.1;   % HSIC diversity coefficient
+%options.lambda1 = 1e-5;
+options.lambda2 = 0;   % co-orthogonal constraint coefficient
+%options.lambda2 = 1e-3;
 %options.beta = 0.001;       % graph regularization coefficient
 options.beta = 115; 
 options.gamma = 5;        % view weight parameter (must be > 1)
-options.graph_k = 7;        % number of neighbors for graph construction
+options.graph_k = 11;        % number of neighbors for graph construction
 options.maxIter = 100;      % maximum iterations
 options.tol = 1e-5;         % convergence tolerance
 
