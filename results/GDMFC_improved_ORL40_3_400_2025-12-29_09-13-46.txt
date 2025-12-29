@@ -1,0 +1,47 @@
+========================================
+GDMFC Improved Experiment Report
+========================================
+
+=== EXPERIMENT METADATA ===
+Timestamp: 2025-12-29_09-13-46
+MATLAB Version: 24.2.0.2712019 (R2024b)
+Computer: PCWIN64
+Random Seed: 2024
+
+=== DATASET INFORMATION ===
+Dataset: ORL40_3_400
+Number of Views: 3
+Number of Samples: 400
+Number of Clusters: 40
+Feature Dimensions: 4096, 3304, 6750
+Preprocessing: NormalizeFea_column_L2 (HDDMF style)
+
+=== ALGORITHM PARAMETERS ===
+Layer Structure: 100 -> 50 -> 40
+lambda1 (diversity): 0.000100
+lambda2 (orthogonal): 0.000000
+beta (graph regularization): 0.100000
+gamma (view weight): 1.500000
+graph_k (neighbors): 5
+maxIter: 100
+tolerance: 1e-05
+Use PKN: 1
+Use Heat Kernel: 0
+Dynamic Graph: 1
+Simple Diversity: 1
+
+=== TRAINING RESULTS ===
+Elapsed Time: 21.9725 seconds
+Iterations: 100 / 100
+Converged: No
+Final Objective: 1.147245e+02
+View Weights: 0.980485, 0.001741, 0.017775
+
+=== CLUSTERING PERFORMANCE ===
+ACC:    0.622500 (62.25%)
+NMI:    0.797469 (79.75%)
+Purity: 0.655000 (65.50%)
+
+========================================
+End of Report
+========================================

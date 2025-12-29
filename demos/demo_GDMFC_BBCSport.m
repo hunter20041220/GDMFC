@@ -1,22 +1,14 @@
-% demo_GDMFC.m
-% Demonstration script for GDMFC algorithm on WebKB dataset
-% GDMFC算法在WebKB数据集上的演示脚本
+%==========================================================================
+% GDMFC Demo on BBCSport Dataset
+%==========================================================================
+% 此脚本演示如何在BBCSport数据集上使用GDMFC算法
+% This script demonstrates how to use GDMFC algorithm on BBCSport dataset
 %
-% This script demonstrates the complete pipeline:
-% 本脚本演示完整流程：
-%   1. Load WebKB multi-view dataset
-%      加载WebKB多视图数据集
-%   2. Preprocess data (normalization)
-%      数据预处理（归一化）
-%   3. Run GDMFC algorithm
-%      运行GDMFC算法
-%   4. Perform spectral clustering on learned representations
-%      对学习到的表示进行谱聚类
-%   5. Evaluate clustering performance (ACC, NMI, Purity)
-%      评估聚类性能
-%
-% Author: Generated for GDMFC research project
-% Date: 2024
+% BBCSport数据集: 544篇体育新闻文档, 5类 (athletics, cricket, football, rugby, tennis)
+% BBCSport dataset: 544 sports news documents, 5 classes
+% 2个视图: View 1 (3183维), View 2 (3203维) - 文本特征
+% 2 views: View 1 (3183-dim), View 2 (3203-dim) - Text features
+%==========================================================================
 
 clear; clc; close all;
 
@@ -34,24 +26,28 @@ rng_seed = 2024;
 rng(rng_seed);
 experiment_info.random_seed = rng_seed;
 
-%% ==================== Add Paths 添加路径 ====================
-% Add paths to helper functions from other directories
-% 添加其他目录中辅助函数的路径
-addpath(genpath('../DMF_MVC/misc'));  % for evaluation functions
-addpath(genpath('../DMF_MVC/approx_seminmf'));  % for Semi-NMF
+%% Add paths 添加路径
+% Get the root directory of GDMFC
+script_dir = fileparts(mfilename('fullpath'));
+root_dir = fileparts(script_dir);
+addpath(genpath(fullfile(root_dir, 'core')));
+addpath(genpath(fullfile(root_dir, 'utils')));
+addpath(genpath(fullfile(root_dir, 'solvers')));
 
 fprintf('========================================\n');
-fprintf('GDMFC Demo on WebKB Dataset\n');
+fprintf('GDMFC Demo on BBCSport Dataset\n');
 fprintf('========================================\n');
 fprintf('Experiment Time: %s\n', experiment_info.timestamp);
 fprintf('MATLAB Version: %s\n', experiment_info.matlab_version);
 fprintf('Random Seed: %d\n', rng_seed);
 fprintf('========================================\n\n');
 
-%% ==================== Load Dataset 加载数据集 ====================
-fprintf('Step 1: Loading WebKB dataset...\n');
-dataPath = '../../dataset/WebKB.mat';
-dataset_name = 'WebKB';
+%% ==================== Load BBCSport Dataset 加载BBCSport数据集 ====================
+fprintf('Step 1: Loading BBCSport dataset...\n');
+
+% Dataset path 数据集路径
+dataset_name = 'BBCSport';
+dataPath = 'E:\research\paper\multiview\dataset\BBCSport.mat';
 
 if ~exist(dataPath, 'file')
     error('Dataset file not found: %s\nPlease check the path.', dataPath);
@@ -59,17 +55,17 @@ end
 
 load(dataPath);
 
-% Dataset info: X{1} is Anchor view, X{2} is Content view
-% 数据集信息：X{1}是Anchor视图，X{2}是Content视图
+% Dataset info: X{1} and X{2} are two text feature views
+% 数据集信息：X{1}和X{2}是两个文本特征视图
 numView = length(X);
-numSample = size(X{1}, 1);
+numSamples = size(X{1}, 1);
 numCluster = length(unique(y));
 
 % Record dataset information 记录数据集详细信息
 experiment_info.dataset_name = dataset_name;
 experiment_info.dataset_path = dataPath;
 experiment_info.num_views = numView;
-experiment_info.num_samples = numSample;
+experiment_info.num_samples = numSamples;
 experiment_info.num_clusters = numCluster;
 experiment_info.num_classes = numCluster;
 
@@ -79,10 +75,14 @@ for v = 1:numView
     experiment_info.feature_dims(v) = size(X{v}, 2);
 end
 
+% Class names for BBCSport
+experiment_info.class_names = {'athletics', 'cricket', 'football', 'rugby', 'tennis'};
+
 fprintf('  Dataset: %s\n', dataset_name);
 fprintf('  Number of views: %d\n', numView);
-fprintf('  Number of samples: %d\n', numSample);
-fprintf('  Number of clusters: %d\n', numCluster);
+fprintf('  Number of samples: %d\n', numSamples);
+fprintf('  Number of classes: %d\n', numCluster);
+fprintf('  Class names: %s\n', strjoin(experiment_info.class_names, ', '));
 fprintf('  Feature dimensions: ');
 for v = 1:numView
     fprintf('%d', experiment_info.feature_dims(v));
@@ -100,8 +100,8 @@ experiment_info.preprocessing_style = 'Standard';
 % Normalize each view to unit length
 % 将每个视图归一化为单位长度
 for v = 1:numView
-    X{v} = NormalizeFea(X{v}, 0);  % L2 normalization
-    fprintf('  View %d: %d samples × %d features\n', v, size(X{v}, 1), size(X{v}, 2));
+    X{v} = NormalizeFea(X{v}, 0);  % L2 normalization (sample-wise)
+    fprintf('  View %d preprocessed: %d samples × %d features\n', v, size(X{v}, 1), size(X{v}, 2));
 end
 fprintf('  Data normalized (L2 norm).\n\n');
 
@@ -109,24 +109,23 @@ fprintf('  Data normalized (L2 norm).\n\n');
 fprintf('Step 3: Setting algorithm parameters...\n');
 
 % Layer configuration 层配置
-% For WebKB with 2 classes, we use a simple 2-layer structure
-% 对于有2个类别的WebKB，使用简单的两层结构
-layers = [100, 50];  % hidden layer dimensions: 100 -> 50 -> numCluster
+% For BBCSport with 5 classes, use appropriate layer structure
+% 对于5类的BBCSport，使用合适的层结构
+layers = [200, 100];  % hidden layers: 200 -> 100 (output layer is numCluster=5)
 
 % Record layer configuration 记录层配置
 experiment_info.layers = layers;
 experiment_info.full_architecture = [experiment_info.feature_dims', layers, numCluster];
 
 % Algorithm parameters 算法参数
-% 使用较小的正则化系数以保证数值稳定性
 options = struct();
-options.lambda1 = 0.001;    % HSIC diversity coefficient HSIC多样性系数 (降低以提高稳定性)
-options.lambda2 = 0.010;    % co-orthogonal constraint coefficient 协正交约束系数 (降低)
-options.beta = 115;         % graph regularization coefficient 图正则化系数 (降低)
-options.gamma = 1.2;        % view weight parameter (must be > 1) 视图权重参数
-options.graph_k = 7;        % number of neighbors for graph construction 图构造邻居数
-options.maxIter = 100;      % maximum iterations 最大迭代次数
-options.tol = 1e-5;         % convergence tolerance 收敛容差
+options.lambda1 = 0.001;     % HSIC diversity coefficient HSIC多样性系数
+options.lambda2 = 0.01;      % co-orthogonal constraint coefficient 协正交约束系数
+options.beta = 150;          % graph regularization coefficient 图正则化系数
+options.gamma = 1.2;         % view weight parameter (must be > 1) 视图权重参数
+options.graph_k = 7;         % number of neighbors for graph construction 图构造邻居数
+options.maxIter = 100;       % maximum iterations 最大迭代次数
+options.tol = 1e-5;          % convergence tolerance 收敛容差
 
 % Record all parameters to experiment_info 记录所有参数到实验信息
 experiment_info.options = options;
@@ -201,7 +200,6 @@ res = bestMap(y, predict_labels);
 ACC = length(find(y == res)) / length(y);
 
 % NMI: Normalized Mutual Information 归一化互信息
-% 使用MutualInfo函数，它采用sqrt((MI/Hx)*(MI/Hy))归一化，更稳定
 NMI = MutualInfo(y, predict_labels);
 
 % Purity: Clustering Purity 聚类纯度
@@ -212,7 +210,7 @@ experiment_info.ACC = ACC;
 experiment_info.NMI = NMI;
 experiment_info.Purity = Purity;
 
-fprintf('Results on WebKB Dataset:\n');
+fprintf('Results on BBCSport Dataset:\n');
 fprintf('  ACC    = %.4f (%.2f%%)\n', ACC, ACC*100);
 fprintf('  NMI    = %.4f (%.2f%%)\n', NMI, NMI*100);
 fprintf('  Purity = %.4f (%.2f%%)\n', Purity, Purity*100);
@@ -247,7 +245,7 @@ fprintf('========================================\n\n');
 fprintf('Step 8: Visualizing results...\n');
 
 % Plot objective function convergence 绘制目标函数收敛曲线
-figure('Name', 'GDMFC on WebKB', 'Position', [100, 100, 1200, 400]);
+figure('Name', 'GDMFC on BBCSport', 'Position', [100, 100, 1200, 400]);
 
 subplot(1, 3, 1);
 plot(1:length(obj_values), obj_values, 'b-', 'LineWidth', 2);
@@ -262,6 +260,7 @@ xlabel('View Index', 'FontSize', 12);
 ylabel('Weight', 'FontSize', 12);
 title('Learned View Weights', 'FontSize', 14);
 set(gca, 'XTick', 1:numView);
+set(gca, 'XTickLabel', {'View 1', 'View 2'});
 grid on;
 
 % Plot 3: Performance comparison 性能对比
@@ -308,37 +307,31 @@ results.elapsed_time = elapsed_time;
 results.options = options;
 results.layers = layers;
 
-% Use the save_experiment_results function
-% Get script directory
-script_dir = fileparts(mfilename('fullpath'));
-root_dir = fileparts(script_dir);
-addpath(fullfile(root_dir, 'utils'));
-
-% Create results directory with timestamp subfolder
+% Create results directory with timestamp subfolder 创建带时间戳子文件夹的results目录
 results_base_dir = fullfile(root_dir, 'results');
 if ~exist(results_base_dir, 'dir')
     mkdir(results_base_dir);
 end
 
-% Create experiment-specific subfolder
+% Create experiment-specific subfolder 创建实验专用子文件夹
 exp_folder_name = sprintf('GDMFC_%s_%s', dataset_name, experiment_info.timestamp);
 results_dir = fullfile(results_base_dir, exp_folder_name);
 mkdir(results_dir);
 fprintf('  Created experiment folder: %s\n', exp_folder_name);
 
-% Generate filenames
+% Generate filenames 生成文件名（不带时间戳，因为文件夹已经有了）
 base_filename = sprintf('GDMFC_%s', dataset_name);
 mat_filename = [base_filename, '.mat'];
 txt_filename = [base_filename, '.txt'];
 excel_filename = [base_filename, '.xlsx'];
 fig_filename = [base_filename, '.png'];
 
-% Save .mat file
+% Save .mat file 保存.mat文件
 mat_filepath = fullfile(results_dir, mat_filename);
 save(mat_filepath, 'results');
 fprintf('  [1/4] MAT file saved: %s\n', mat_filename);
 
-% Save text report
+% Save text report 保存文本报告
 txt_filepath = fullfile(results_dir, txt_filename);
 fid = fopen(txt_filepath, 'w');
 fprintf(fid, '========================================\n');
@@ -357,6 +350,7 @@ fprintf(fid, 'Dataset: %s\n', experiment_info.dataset_name);
 fprintf(fid, 'Number of Views: %d\n', experiment_info.num_views);
 fprintf(fid, 'Number of Samples: %d\n', experiment_info.num_samples);
 fprintf(fid, 'Number of Clusters: %d\n', experiment_info.num_clusters);
+fprintf(fid, 'Class Names: %s\n', strjoin(experiment_info.class_names, ', '));
 fprintf(fid, 'Feature Dimensions: ');
 for v = 1:experiment_info.num_views
     fprintf(fid, '%d', experiment_info.feature_dims(v));
@@ -405,10 +399,10 @@ fprintf(fid, '========================================\n');
 fclose(fid);
 fprintf('  [2/4] Text report saved: %s\n', txt_filename);
 
-% Save Excel file
+% Save Excel file with detailed results 保存Excel文件
 excel_filepath = fullfile(results_dir, excel_filename);
 
-% Sheet 1: Summary
+% Sheet 1: Summary 摘要
 summary_data = {
     'Metric', 'Value';
     '=== EXPERIMENT INFO ===', '';
@@ -421,6 +415,7 @@ summary_data = {
     'Number of Views', experiment_info.num_views;
     'Number of Samples', experiment_info.num_samples;
     'Number of Clusters', experiment_info.num_clusters;
+    'Class Names', strjoin(experiment_info.class_names, ', ');
     'Preprocessing Method', experiment_info.preprocessing_method;
     '', '';
     '=== PERFORMANCE ===', '';
@@ -440,7 +435,7 @@ summary_data = {
 };
 writecell(summary_data, excel_filepath, 'Sheet', 'Summary');
 
-% Sheet 2: Parameters
+% Sheet 2: Parameters 参数
 param_data = {
     'Parameter', 'Value', 'Description';
     'lambda1', options.lambda1, 'HSIC diversity coefficient';
@@ -453,7 +448,7 @@ param_data = {
 };
 writecell(param_data, excel_filepath, 'Sheet', 'Parameters');
 
-% Sheet 3: Architecture
+% Sheet 3: Architecture 架构
 arch_header = {'Layer', 'Dimension'};
 arch_data = cell(length(experiment_info.full_architecture), 2);
 for i = 1:length(experiment_info.full_architecture)
@@ -468,16 +463,18 @@ for i = 1:length(experiment_info.full_architecture)
 end
 writecell([arch_header; arch_data], excel_filepath, 'Sheet', 'Architecture');
 
-% Sheet 4: View Weights
-view_weights_header = {'View', 'Weight'};
-view_weights_data = cell(numView, 2);
+% Sheet 4: View Weights 视图权重
+view_weights_header = {'View', 'Weight', 'Description'};
+view_weights_data = cell(numView, 3);
+view_desc = {'Text features (View 1)', 'Text features (View 2)'};
 for v = 1:numView
     view_weights_data{v, 1} = sprintf('View %d', v);
     view_weights_data{v, 2} = alpha(v);
+    view_weights_data{v, 3} = view_desc{v};
 end
 writecell([view_weights_header; view_weights_data], excel_filepath, 'Sheet', 'ViewWeights');
 
-% Sheet 5: Convergence
+% Sheet 5: Convergence 收敛过程
 conv_header = {'Iteration', 'Objective Value'};
 conv_data = cell(length(obj_values), 2);
 for i = 1:length(obj_values)
@@ -488,7 +485,7 @@ writecell([conv_header; conv_data], excel_filepath, 'Sheet', 'Convergence');
 
 fprintf('  [3/4] Excel file saved: %s\n', excel_filename);
 
-% Save figure
+% Save figure as image 保存图表为图片
 fig_filepath = fullfile(results_dir, fig_filename);
 saveas(gcf, fig_filepath);
 fprintf('  [4/4] Figure saved: %s\n', fig_filename);
@@ -506,11 +503,11 @@ fprintf('\nFull path: %s\n', results_dir);
 fprintf('========================================\n\n');
 
 fprintf('========================================\n');
-fprintf('GDMFC Demo Completed Successfully!\n');
+fprintf('GDMFC Demo on BBCSport Completed Successfully!\n');
 fprintf('========================================\n');
 
 
-%% ==================== Helper Function 辅助函数 ====================
+%% ==================== Helper Functions 辅助函数 ====================
 function purity = compute_purity(y_true, y_pred)
 % Compute clustering purity 计算聚类纯度
 %
@@ -542,6 +539,7 @@ purity = purity_sum / n;
 end
 
 function result = iif(condition, true_val, false_val)
+% Inline if function 内联条件函数
     if condition
         result = true_val;
     else

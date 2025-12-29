@@ -1,0 +1,44 @@
+========================================
+GDMFC Experiment Report
+========================================
+
+=== EXPERIMENT METADATA ===
+Timestamp: 2025-12-29_09-42-57
+MATLAB Version: 24.2.0.2712019 (R2024b)
+Computer: PCWIN64
+Random Seed: 2024
+
+=== DATASET INFORMATION ===
+Dataset: BBCSport
+Number of Views: 2
+Number of Samples: 544
+Number of Clusters: 5
+Class Names: athletics, cricket, football, rugby, tennis
+Feature Dimensions: 3183, 3203
+Preprocessing: NormalizeFea_L2 (Standard style)
+
+=== ALGORITHM PARAMETERS ===
+Layer Structure: 200 -> 100 -> 5
+lambda1 (diversity): 0.010000
+lambda2 (orthogonal): 0.001000
+beta (graph regularization): 150.000000
+gamma (view weight): 1.200000
+graph_k (neighbors): 7
+maxIter: 100
+tolerance: 1e-05
+
+=== TRAINING RESULTS ===
+Elapsed Time: 22.0743 seconds
+Iterations: 100 / 100
+Converged: No
+Final Objective: 3.294207e+03
+View Weights: 0.506804, 0.493196
+
+=== CLUSTERING PERFORMANCE ===
+ACC:    0.492647 (49.26%)
+NMI:    0.255144 (25.51%)
+Purity: 0.520221 (52.02%)
+
+========================================
+End of Report
+========================================
