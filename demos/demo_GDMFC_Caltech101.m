@@ -1,13 +1,19 @@
 %==========================================================================
-% GDMFC Demo on BBCSport Dataset
+% GDMFC Demo on Caltech101-7 Dataset
 %==========================================================================
-% 此脚本演示如何在BBCSport数据集上使用GDMFC算法
-% This script demonstrates how to use GDMFC algorithm on BBCSport dataset
+% 此脚本演示如何在Caltech101-7数据集上使用GDMFC算法
+% This script demonstrates how to use GDMFC algorithm on Caltech101-7 dataset
 %
-% BBCSport数据集: 544篇体育新闻文档, 5类 (athletics, cricket, football, rugby, tennis)
-% BBCSport dataset: 544 sports news documents, 5 classes
-% 2个视图: View 1 (3183维), View 2 (3203维) - 文本特征
-% 2 views: View 1 (3183-dim), View 2 (3203-dim) - Text features
+% Caltech101-7数据集: 1474张图像, 7类
+% Caltech101-7 dataset: 1474 images, 7 classes
+% 6个视图: 不同的图像特征提取方法 (Gabor, WM, CENTRIST, HOG, GIST, LBP)
+% 6 views: Different image feature extraction methods
+%   View 1: 48-dim (Gabor)
+%   View 2: 40-dim (WM - Wavelet Moments)
+%   View 3: 254-dim (CENTRIST)
+%   View 4: 1984-dim (HOG)
+%   View 5: 512-dim (GIST)
+%   View 6: 928-dim (LBP)
 %==========================================================================
 
 clear; clc; close all;
@@ -35,19 +41,19 @@ addpath(genpath(fullfile(root_dir, 'utils')));
 addpath(genpath(fullfile(root_dir, 'solvers')));
 
 fprintf('========================================\n');
-fprintf('GDMFC Demo on BBCSport Dataset\n');
+fprintf('GDMFC Demo on Caltech101-7 Dataset\n');
 fprintf('========================================\n');
 fprintf('Experiment Time: %s\n', experiment_info.timestamp);
 fprintf('MATLAB Version: %s\n', experiment_info.matlab_version);
 fprintf('Random Seed: %d\n', rng_seed);
 fprintf('========================================\n\n');
 
-%% ==================== Load BBCSport Dataset 加载BBCSport数据集 ====================
-fprintf('Step 1: Loading BBCSport dataset...\n');
+%% ==================== Load Caltech101-7 Dataset 加载Caltech101-7数据集 ====================
+fprintf('Step 1: Loading Caltech101-7 dataset...\n');
 
 % Dataset path 数据集路径
-dataset_name = 'BBCSport';
-dataPath = 'E:\research\paper\multiview\dataset\BBCSport.mat';
+dataset_name = 'Caltech101-7';
+dataPath = 'E:\research\paper\multiview\dataset\Caltech101-7.mat';
 
 if ~exist(dataPath, 'file')
     error('Dataset file not found: %s\nPlease check the path.', dataPath);
@@ -55,8 +61,8 @@ end
 
 load(dataPath);
 
-% Dataset info: X{1} and X{2} are two text feature views
-% 数据集信息：X{1}和X{2}是两个文本特征视图
+% Dataset info: X contains 6 views with different image features
+% 数据集信息：X包含6个视图，使用不同的图像特征
 numView = length(X);
 numSamples = size(X{1}, 1);
 numCluster = length(unique(y));
@@ -75,20 +81,18 @@ for v = 1:numView
     experiment_info.feature_dims(v) = size(X{v}, 2);
 end
 
-% Class names for BBCSport
-experiment_info.class_names = {'athletics', 'cricket', 'football', 'rugby', 'tennis'};
+% View names for Caltech101-7
+experiment_info.view_names = {'Gabor', 'WM', 'CENTRIST', 'HOG', 'GIST', 'LBP'};
 
 fprintf('  Dataset: %s\n', dataset_name);
 fprintf('  Number of views: %d\n', numView);
 fprintf('  Number of samples: %d\n', numSamples);
 fprintf('  Number of classes: %d\n', numCluster);
-fprintf('  Class names: %s\n', strjoin(experiment_info.class_names, ', '));
-fprintf('  Feature dimensions: ');
+fprintf('  View features:\n');
 for v = 1:numView
-    fprintf('%d', experiment_info.feature_dims(v));
-    if v < numView, fprintf(', '); end
+    fprintf('    View %d (%s): %d dimensions\n', v, experiment_info.view_names{v}, experiment_info.feature_dims(v));
 end
-fprintf('\n\n');
+fprintf('\n');
 
 %% ==================== Data Preprocessing 数据预处理 ====================
 fprintf('Step 2: Preprocessing data...\n');
@@ -101,7 +105,8 @@ experiment_info.preprocessing_style = 'Standard';
 % 将每个视图归一化为单位长度
 for v = 1:numView
     X{v} = NormalizeFea(X{v}, 0);  % L2 normalization (sample-wise)
-    fprintf('  View %d preprocessed: %d samples × %d features\n', v, size(X{v}, 1), size(X{v}, 2));
+    fprintf('  View %d (%s) preprocessed: %d samples × %d features\n', ...
+        v, experiment_info.view_names{v}, size(X{v}, 1), size(X{v}, 2));
 end
 fprintf('  Data normalized (L2 norm).\n\n');
 
@@ -109,9 +114,9 @@ fprintf('  Data normalized (L2 norm).\n\n');
 fprintf('Step 3: Setting algorithm parameters...\n');
 
 % Layer configuration 层配置
-% For BBCSport with 5 classes, use appropriate layer structure
-% 对于5类的BBCSport，使用合适的层结构
-layers = [200, 100];  % hidden layers: 200 -> 100 (output layer is numCluster=5)
+% For Caltech101-7 with 7 classes and 6 views, use appropriate layer structure
+% 对于7类、6视图的Caltech101-7，使用合适的层结构
+layers = [200, 100];  % hidden layers: 200 -> 100 (output layer is numCluster=7)
 
 % Record layer configuration 记录层配置
 experiment_info.layers = layers;
@@ -121,7 +126,7 @@ experiment_info.full_architecture = [experiment_info.feature_dims', layers, numC
 options = struct();
 options.lambda1 = 0.001;     % HSIC diversity coefficient HSIC多样性系数
 options.lambda2 = 0.01;      % co-orthogonal constraint coefficient 协正交约束系数
-options.beta = 150;          % graph regularization coefficient 图正则化系数
+options.beta = 100;          % graph regularization coefficient 图正则化系数
 options.gamma = 1.2;         % view weight parameter (must be > 1) 视图权重参数
 options.graph_k = 7;         % number of neighbors for graph construction 图构造邻居数
 options.maxIter = 100;       % maximum iterations 最大迭代次数
@@ -166,14 +171,11 @@ fprintf('  Time elapsed: %.2f seconds\n', elapsed_time);
 fprintf('  Iterations: %d / %d\n', length(obj_values), options.maxIter);
 fprintf('  Converged: %s\n', iif(experiment_info.converged, 'Yes', 'No (max iter)'));
 fprintf('  Final objective: %.6e\n', obj_values(end));
-fprintf('  Final view weights: [');
+fprintf('  Final view weights:\n');
 for v = 1:numView
-    fprintf('%.4f', alpha(v));
-    if v < numView
-        fprintf(', ');
-    end
+    fprintf('    View %d (%s): %.4f\n', v, experiment_info.view_names{v}, alpha(v));
 end
-fprintf(']\n\n');
+fprintf('\n');
 
 %% ==================== Clustering 聚类 ====================
 fprintf('Step 5: Performing spectral clustering...\n');
@@ -210,7 +212,7 @@ experiment_info.ACC = ACC;
 experiment_info.NMI = NMI;
 experiment_info.Purity = Purity;
 
-fprintf('Results on BBCSport Dataset:\n');
+fprintf('Results on Caltech101-7 Dataset:\n');
 fprintf('  ACC    = %.4f (%.2f%%)\n', ACC, ACC*100);
 fprintf('  NMI    = %.4f (%.2f%%)\n', NMI, NMI*100);
 fprintf('  Purity = %.4f (%.2f%%)\n', Purity, Purity*100);
@@ -245,7 +247,7 @@ fprintf('========================================\n\n');
 fprintf('Step 8: Visualizing results...\n');
 
 % Plot objective function convergence 绘制目标函数收敛曲线
-figure('Name', 'GDMFC on BBCSport', 'Position', [100, 100, 1200, 400]);
+figure('Name', 'GDMFC on Caltech101-7', 'Position', [100, 100, 1400, 500]);
 
 subplot(1, 3, 1);
 plot(1:length(obj_values), obj_values, 'b-', 'LineWidth', 2);
@@ -260,7 +262,8 @@ xlabel('View Index', 'FontSize', 12);
 ylabel('Weight', 'FontSize', 12);
 title('Learned View Weights', 'FontSize', 14);
 set(gca, 'XTick', 1:numView);
-set(gca, 'XTickLabel', {'View 1', 'View 2'});
+set(gca, 'XTickLabel', experiment_info.view_names);
+xtickangle(45);
 grid on;
 
 % Plot 3: Performance comparison 性能对比
@@ -350,13 +353,10 @@ fprintf(fid, 'Dataset: %s\n', experiment_info.dataset_name);
 fprintf(fid, 'Number of Views: %d\n', experiment_info.num_views);
 fprintf(fid, 'Number of Samples: %d\n', experiment_info.num_samples);
 fprintf(fid, 'Number of Clusters: %d\n', experiment_info.num_clusters);
-fprintf(fid, 'Class Names: %s\n', strjoin(experiment_info.class_names, ', '));
-fprintf(fid, 'Feature Dimensions: ');
-for v = 1:experiment_info.num_views
-    fprintf(fid, '%d', experiment_info.feature_dims(v));
-    if v < experiment_info.num_views, fprintf(fid, ', '); end
+fprintf(fid, 'View Features:\n');
+for v = 1:numView
+    fprintf(fid, '  View %d (%s): %d dimensions\n', v, experiment_info.view_names{v}, experiment_info.feature_dims(v));
 end
-fprintf(fid, '\n');
 fprintf(fid, 'Preprocessing: %s (%s style)\n', experiment_info.preprocessing_method, experiment_info.preprocessing_style);
 fprintf(fid, '\n');
 
@@ -380,12 +380,11 @@ fprintf(fid, 'Elapsed Time: %.4f seconds\n', elapsed_time);
 fprintf(fid, 'Iterations: %d / %d\n', experiment_info.num_iterations, options.maxIter);
 fprintf(fid, 'Converged: %s\n', iif(experiment_info.converged, 'Yes', 'No'));
 fprintf(fid, 'Final Objective: %.6e\n', experiment_info.final_obj_value);
-fprintf(fid, 'View Weights: ');
+fprintf(fid, 'View Weights:\n');
 for v = 1:numView
-    fprintf(fid, '%.6f', alpha(v));
-    if v < numView, fprintf(fid, ', '); end
+    fprintf(fid, '  %s: %.6f\n', experiment_info.view_names{v}, alpha(v));
 end
-fprintf(fid, '\n\n');
+fprintf(fid, '\n');
 
 fprintf(fid, '=== CLUSTERING PERFORMANCE ===\n');
 fprintf(fid, 'ACC:    %.6f (%.2f%%)\n', ACC_mean, ACC_mean*100);
@@ -415,7 +414,6 @@ summary_data = {
     'Number of Views', experiment_info.num_views;
     'Number of Samples', experiment_info.num_samples;
     'Number of Clusters', experiment_info.num_clusters;
-    'Class Names', strjoin(experiment_info.class_names, ', ');
     'Preprocessing Method', experiment_info.preprocessing_method;
     '', '';
     '=== PERFORMANCE ===', '';
@@ -453,7 +451,7 @@ arch_header = {'Layer', 'Dimension'};
 arch_data = cell(length(experiment_info.full_architecture), 2);
 for i = 1:length(experiment_info.full_architecture)
     if i <= experiment_info.num_views
-        arch_data{i, 1} = sprintf('Input View %d', i);
+        arch_data{i, 1} = sprintf('Input View %d (%s)', i, experiment_info.view_names{i});
     elseif i <= experiment_info.num_views + length(layers)
         arch_data{i, 1} = sprintf('Hidden Layer %d', i - experiment_info.num_views);
     else
@@ -464,13 +462,13 @@ end
 writecell([arch_header; arch_data], excel_filepath, 'Sheet', 'Architecture');
 
 % Sheet 4: View Weights 视图权重
-view_weights_header = {'View', 'Weight', 'Description'};
-view_weights_data = cell(numView, 3);
-view_desc = {'Text features (View 1)', 'Text features (View 2)'};
+view_weights_header = {'View', 'Feature Type', 'Dimension', 'Weight'};
+view_weights_data = cell(numView, 4);
 for v = 1:numView
     view_weights_data{v, 1} = sprintf('View %d', v);
-    view_weights_data{v, 2} = alpha(v);
-    view_weights_data{v, 3} = view_desc{v};
+    view_weights_data{v, 2} = experiment_info.view_names{v};
+    view_weights_data{v, 3} = experiment_info.feature_dims(v);
+    view_weights_data{v, 4} = alpha(v);
 end
 writecell([view_weights_header; view_weights_data], excel_filepath, 'Sheet', 'ViewWeights');
 
@@ -503,7 +501,7 @@ fprintf('\nFull path: %s\n', results_dir);
 fprintf('========================================\n\n');
 
 fprintf('========================================\n');
-fprintf('GDMFC Demo on BBCSport Completed Successfully!\n');
+fprintf('GDMFC Demo on Caltech101-7 Completed Successfully!\n');
 fprintf('========================================\n');
 
 
