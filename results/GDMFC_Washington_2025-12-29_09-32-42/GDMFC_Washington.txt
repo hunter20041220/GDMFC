@@ -1,0 +1,55 @@
+========================================
+GDMFC Experiment Report
+Washington WebKB Dataset
+========================================
+
+=== EXPERIMENT METADATA ===
+Timestamp: 2025-12-29_09-32-42
+MATLAB Version: 24.2.0.2712019 (R2024b)
+Computer: PCWIN64
+User: 25355
+Random Seed: 2024
+
+=== DATASET INFORMATION ===
+Dataset: Washington
+Number of Views: 4
+View Names: Content, Inbound, Outbound, Cites
+Number of Samples: 230
+Number of Clusters: 5
+Class Names: project, course, student, faculty, staff
+Feature Dimensions: 1703, 230, 230, 230
+
+=== PREPROCESSING ===
+Step 1: data_guiyi_choos mode 3 (column-wise L2)
+Step 2: NormalizeFea L2 (sample-wise)
+Preprocessing Mode: 3
+
+=== ALGORITHM PARAMETERS ===
+Layer Structure: 100 -> 50 -> 20 -> 5
+lambda1 (HSIC diversity): 0.010000
+lambda2 (co-orthogonal): 0.001000
+beta (graph regularization): 200.000000
+gamma (view weight): 1.200000
+graph_k (neighbors): 7
+maxIter: 100
+tolerance: 1e-05
+
+=== TRAINING RESULTS ===
+Elapsed Time: 3.0517 seconds
+Iterations: 44 / 100
+Converged: Yes
+Final Objective: 1.990597e+02
+View Weights:
+  Content: 0.000000
+  Inbound: 0.333333
+  Outbound: 0.333333
+  Cites: 0.333333
+
+=== CLUSTERING PERFORMANCE ===
+ACC:    0.378261 (37.83%)
+NMI:    0.097211 (9.72%)
+Purity: 0.569565 (56.96%)
+
+========================================
+End of Report
+========================================
