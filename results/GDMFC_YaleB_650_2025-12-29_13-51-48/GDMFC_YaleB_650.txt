@@ -1,0 +1,43 @@
+========================================
+GDMFC Experiment Report - YaleB Dataset
+========================================
+
+=== EXPERIMENT METADATA ===
+Timestamp: 2025-12-29_13-51-48
+MATLAB Version: 24.2.0.2712019 (R2024b)
+Computer: PCWIN64
+Random Seed: 2024
+
+=== DATASET INFORMATION ===
+Dataset: YaleB_650
+Number of Views: 3
+Number of Samples: 650
+Number of Clusters: 10
+Feature Dimensions: 2500, 3304, 6750
+Preprocessing: NormalizeFea_L2 (Standard style)
+
+=== ALGORITHM PARAMETERS ===
+Layer Structure: 200 -> 100 -> 10
+lambda1 (diversity): 0.001000
+lambda2 (orthogonal): 0.010000
+beta (graph regularization): 100.000000
+gamma (view weight): 1.200000
+graph_k (neighbors): 7
+maxIter: 100
+tolerance: 1e-05
+
+=== TRAINING RESULTS ===
+Elapsed Time: 54.6402 seconds
+Iterations: 100 / 100
+Converged: No
+Final Objective: 1.886879e+03
+View Weights: 0.990558, 0.000707, 0.008735
+
+=== CLUSTERING PERFORMANCE ===
+ACC:    0.313846 (31.38%)
+NMI:    0.280370 (28.04%)
+Purity: 0.384615 (38.46%)
+
+========================================
+End of Report
+========================================

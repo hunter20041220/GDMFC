@@ -1,0 +1,32 @@
+===== Presentation =====
+This dataset have been downloaded from http://www.cs.umd.edu/projects/linqs/projects/lbc/
+		
+date: February, 2012
+
+
+===== Description =====
+The archive contains 187 documents over the 5 labels (student,project,course,staff,faculty). It is made of 4 views (content,inbound,outbound,cites) on the same documents. The documents are described by 1703 words in the content view, and by the 578 links between them in the inbound, outbound and cites views.
+
+===== Files =====
+All the files are encoded in UTF8.
+
+texas_content.mtx -- 
+	the documents-words matrix, containing 0/1 values indicating absence/presence of a word in a document, in the Matrix Market coordinate format (sparse).
+
+texas_inbound.mtx -- 
+	the matrix indicating by 0/1 values the inbound links between documents, in the Matrix Market coordinate format (sparse).
+
+texas_outbound.mtx -- 
+	the matrix indicating by 0/1 values the outbound links between documents, in the Matrix Market coordinate format (sparse). It is the transpose of texas_inbound.mtx.
+
+texas_cites.mtx -- 
+	the matrix of the number of citation links between documents, in the Matrix Market coordinate format (sparse). It is the sum of texas_inbound.mtx and texas_outbound.mtx.
+
+documents-mapping.txt -- 
+	the mapping between the rows of the matrix and the id of the document in the original collection.
+
+texas.txt --
+	contains the list of the affectations of the documents to a topic.
+
+labels.txt --
+	contains the list of the different labels, in the order of the affectations found in texas_act.txt
