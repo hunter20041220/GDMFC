@@ -1,0 +1,35 @@
+========================================
+GDMFC-Hypergraph Experiment Report
+========================================
+
+Dataset: ORL40_3_400
+Date: 2025-12-31
+Time: 2025-12-31_18-12-10
+MATLAB Version: 24.2.0.2712019 (R2024b)
+
+--- Dataset Information ---
+Number of views: 3
+Number of samples: 400
+Number of classes: 40
+
+--- Algorithm Parameters ---
+Layer structure: [100, 50, 40]
+beta (hypergraph regularization): 0.100000
+lambda1 (diversity): 0.000100
+lambda2 (orthogonal): 0.000000
+gamma (view weight): 1.500000
+k_hyper (hypergraph k-NN): 5
+maxIter: 100
+tolerance: 1e-05
+
+--- Training Results ---
+Elapsed time: 24.27 seconds
+Iterations: 100 / 100
+Converged: No
+Final objective: 2.695416e+01
+View weights: [0.3333, 0.3333, 0.3333]
+
+--- Clustering Performance ---
+ACC:    0.725000 (72.50%)
+NMI:    0.862950 (86.29%)
+Purity: 0.762500 (76.25%)

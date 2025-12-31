@@ -122,7 +122,7 @@ experiment_info.full_architecture = [experiment_info.feature_dims', layers, numC
 
 % Algorithm parameters 算法参数
 options = struct();
-options.lambda1 = 0.001;     % HSIC diversity coefficient HSIC多样性系数
+options.lambda1 = 0.01;     % HSIC diversity coefficient HSIC多样性系数
 options.lambda2 = 0.01;      % co-orthogonal constraint coefficient 协正交约束系数
 options.beta = 100;          % graph regularization coefficient 图正则化系数
 options.gamma = 1.2;         % view weight parameter (must be > 1) 视图权重参数

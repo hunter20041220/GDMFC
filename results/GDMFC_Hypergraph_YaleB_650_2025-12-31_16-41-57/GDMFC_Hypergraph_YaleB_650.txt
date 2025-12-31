@@ -1,0 +1,44 @@
+========================================
+GDMFC-Hypergraph Experiment Report - YaleB Dataset
+========================================
+
+=== EXPERIMENT METADATA ===
+Algorithm: GDMFC_Hypergraph
+Timestamp: 2025-12-31_16-41-57
+MATLAB Version: 24.2.0.2712019 (R2024b)
+Computer: PCWIN64
+Random Seed: 2024
+
+=== DATASET INFORMATION ===
+Dataset: YaleB_650
+Number of Views: 3
+Number of Samples: 650
+Number of Clusters: 10
+Feature Dimensions: 2500, 3304, 6750
+Preprocessing: NormalizeFea_L2 (Standard style)
+
+=== ALGORITHM PARAMETERS ===
+Layer Structure: 200 -> 100 -> 10
+beta (hypergraph regularization): 1.000000
+lambda1 (diversity): 0.100000
+lambda2 (orthogonal): 0.010000
+gamma (view weight): 1.200000
+k_hyper (hypergraph neighbors): 7
+maxIter: 100
+tolerance: 1e-05
+
+=== TRAINING RESULTS ===
+Elapsed Time: 11.4389 seconds
+Iterations: 11 / 100
+Converged: Yes
+Final Objective: 6.765671e+03
+View Weights: 0.999998, 0.000002, 0.000000
+
+=== CLUSTERING PERFORMANCE ===
+ACC:    0.213846 (21.38%)
+NMI:    0.072526 (7.25%)
+Purity: 0.232308 (23.23%)
+
+========================================
+End of Report
+========================================
