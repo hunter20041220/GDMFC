@@ -1,0 +1,17 @@
+========================================
+GDMFC-Hypergraph Experiment Report - YaleB Dataset
+========================================
+
+=== EXPERIMENT METADATA ===
+Algorithm: GDMFC_Hypergraph
+Timestamp: 2025-12-31_17-26-59
+MATLAB Version: 24.2.0.2712019 (R2024b)
+Computer: PCWIN64
+Random Seed: 2024
+
+=== DATASET INFORMATION ===
+Dataset: YaleB_650
+Number of Views: 3
+Number of Samples: 650
+Number of Clusters: 10
+Feature Dimensions: 2500, 3304, 6750
